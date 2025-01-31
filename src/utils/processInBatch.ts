@@ -1,4 +1,7 @@
-const processInBatch = async (tasks, batchSize) => {
+const processInBatch = async <T>(
+  tasks: (() => Promise<T>)[],
+  batchSize: number
+) => {
   const results = [];
 
   for (let i = 0; i < tasks.length; i += batchSize) {
@@ -9,4 +12,4 @@ const processInBatch = async (tasks, batchSize) => {
   return results;
 };
 
-module.exports = processInBatch;
+export default processInBatch;

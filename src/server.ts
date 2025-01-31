@@ -1,4 +1,4 @@
-const express = require("express");
+import express, { Request, Response, NextFunction } from "express";
 
 const app = express();
 const port = 3000;
@@ -6,7 +6,7 @@ const port = 3000;
 const MAX_CONCURRENT_REQUESTS = 5; // 동시 처리 가능한 최대 요청 개수
 let activeRequests = 0;
 
-const limitRequests = (req, res, next) => {
+const limitRequests = (req: Request, res: Response, next: NextFunction) => {
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) {
     console.log(`🔥 서버의 동시 요청 제한을 초과했습니다. 서버를 종료합니다.`);
     res.status(503).json({
@@ -38,7 +38,7 @@ const limitRequests = (req, res, next) => {
 
 app.use(limitRequests);
 
-app.get("/", (req, res) => {
+app.get("/", (req: Request, res: Response): void => {
   setTimeout(() => {
     res.json({
       message: "Hello, World!",
