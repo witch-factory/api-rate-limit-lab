@@ -4,44 +4,60 @@ export class TaskManager<T> {
 
   constructor(private maxConcurrent: number) {}
 
-  public setMaxConcurrent(maxConcurrent: number) {
-    this.maxConcurrent = maxConcurrent;
-  }
-
   addTask(task: () => Promise<T>): void {
     this.queue.push(task);
   }
 
-  // N개씩 동시에 실행하는 메서드
-  async runParallel(): Promise<T[]> {
-    const results: T[] = [];
+  private *taskGenerator() {
+    const currentTasks = [...this.queue];
 
-    return new Promise((resolve) => {
-      const next = async () => {
-        if (this.queue.length === 0 && this.activeRequestCount === 0) {
-          resolve(results); // 모든 작업 완료 시 resolve
+    this.queue = [];
+    yield* currentTasks;
+  }
+
+  private async executeTask(
+    task: () => Promise<T>,
+    results: T[],
+    onComplete: () => void
+  ): Promise<void> {
+    this.activeRequestCount++;
+
+    try {
+      const result = await task();
+      results.push(result);
+    } catch (error) {
+      console.error(`Task failed:`, error);
+    } finally {
+      this.activeRequestCount--;
+      onComplete();
+    }
+  }
+
+  // N개씩 동시에 실행하는 메서드
+  async runTasks(): Promise<T[]> {
+    const results: T[] = [];
+    const taskIterator = this.taskGenerator();
+    let hasMoreTasks = true;
+
+    return new Promise<T[]>((resolve) => {
+      const executeNext = async () => {
+        if (this.activeRequestCount === 0 && !hasMoreTasks) {
+          resolve(results);
           return;
         }
 
-        while (
-          this.activeRequestCount < this.maxConcurrent &&
-          this.queue.length > 0
-        ) {
-          const task = this.queue.shift();
-          if (!task) return;
-          this.activeRequestCount++;
+        while (this.activeRequestCount < this.maxConcurrent && hasMoreTasks) {
+          const { done, value: nextTask } = taskIterator.next();
+          if (done) {
+            hasMoreTasks = false;
+            return;
+          }
 
-          task()
-            .then((result) => results.push(result))
-            .catch((error) => console.error("Task failed:", error))
-            .finally(() => {
-              this.activeRequestCount--;
-              next(); // 작업 하나가 끝날 때마다 다음 작업 실행
-            });
+          this.executeTask(nextTask, results, executeNext);
         }
       };
 
-      next(); // 실행 시작
+      executeNext(); // 실행 시작
     });
   }
 }
