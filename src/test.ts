@@ -1,11 +1,12 @@
 import http from "http";
 import processInBatch from "./utils/processInBatch";
+import { TaskManager } from "./utils/taskManager";
 
 const SERVER_URL = "http://localhost:3000";
-const NUM_REQUESTS = 8; // 동시에 보낼 요청 개수 지정
+const NUM_REQUESTS = 10; // 동시에 보낼 요청 개수 지정
 const BATCH_SIZE = 5; // 한 번에 보낼 요청 개수 지정
 
-const MAX_CONCURRENT_REQUESTS = 5; // 동시 실행할 요청 개수 제한
+const MAX_CONCURRENT_REQUESTS = 4; // 동시 실행할 요청 개수 제한
 
 type ServerResponse = {
   message: string;
@@ -35,13 +36,6 @@ const sendRequest = (index: number): Promise<ServerResponse> => {
           reject(error);
         }
       });
-
-      req.on("error", (error) => {
-        console.error(`요청 ${index} 실패: ${error.message}`);
-        reject(error);
-      });
-
-      req.end();
     });
 
     req.on("error", (err) => {
@@ -81,10 +75,14 @@ const enqueueRequest = (index: number) => {
   runNextRequest(); // 큐 실행
 };
 
+const taskManager = new TaskManager<ServerResponse>(MAX_CONCURRENT_REQUESTS);
+
 const testRequests = async () => {
   for (let i = 1; i <= NUM_REQUESTS; i++) {
-    enqueueRequest(i); // 요청을 큐에 추가
+    taskManager.addTask(() => sendRequest(i));
   }
+  const results = await taskManager.runTasks();
+  console.log(results);
 };
 
 testRequests();
